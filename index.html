@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AES-128 · Register Trace Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">AES</span>
+      <span class="brand-sub">128&nbsp;/&nbsp;REGISTER&nbsp;TRACE</span>
+    </div>
+    <div class="topbar-meta">
+      <span class="meta-item"><span class="dot dot--ecb"></span>ECB · single block</span>
+      <span class="meta-item mono" id="clockReadout">10 rounds</span>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="hero-kicker">Interactive crypto lab</div>
+      <h1>AES-128, tapi lebih enak dilihat, lebih enak dipakai.</h1>
+      <p>
+        Masukkan plaintext dan kunci, lalu lihat setiap ronde AES dibangun sebagai state matrix yang rapi,
+        interaktif, dan memakai notasi matematika yang benar.
+      </p>
+      <div class="hero-chips">
+        <span class="hero-chip">128-bit block</span>
+        <span class="hero-chip">10 rounds</span>
+        <span class="hero-chip">GF(2<sup>8</sup>) math</span>
+      </div>
+    </div>
+    <div class="hero-panel">
+      <div class="hero-panel-label">AES round model</div>
+      <div class="hero-formula" id="heroFormula"></div>
+      <div class="hero-mini-grid">
+        <div><span>State</span><strong>4 × 4 bytes</strong></div>
+        <div><span>Key schedule</span><strong>RK0 → RK10</strong></div>
+        <div><span>View</span><strong>Trace per step</strong></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="layout">
+
+    <!-- ===================== SIDEBAR : ROUND NAVIGATOR ===================== -->
+    <aside class="sidebar" id="roundNav" aria-label="Navigasi ronde">
+      <div class="sidebar-label">Round map</div>
+      <ol class="round-list" id="roundList">
+        <!-- populated by app.js -->
+      </ol>
+    </aside>
+
+    <!-- ===================== MAIN ===================== -->
+    <main class="main">
+
+      <!-- INPUT PANEL -->
+      <section class="panel input-panel">
+        <div class="panel-head">
+          <h2>Input</h2>
+          <div class="mode-switch" role="tablist" aria-label="Mode operasi">
+            <button class="mode-btn is-active" data-mode="encrypt" role="tab" aria-selected="true">Encrypt</button>
+            <button class="mode-btn" data-mode="decrypt" role="tab" aria-selected="false">Decrypt</button>
+          </div>
+        </div>
+
+        <div class="input-grid">
+          <div class="field">
+            <label for="plaintextInput">
+              <span id="ptLabel">Plaintext</span>
+              <span class="field-hint" id="ptHint">Teks (maks. 16 karakter) atau 32 hex</span>
+            </label>
+            <div class="field-row">
+              <input type="text" id="plaintextInput" class="field-input mono" placeholder="mis. attackatdawn12 atau 32 digit hex" maxlength="64" autocomplete="off" spellcheck="false">
+              <div class="format-toggle" id="ptFormatToggle">
+                <button type="button" class="fmt-btn is-active" data-fmt="text">TEXT</button>
+                <button type="button" class="fmt-btn" data-fmt="hex">HEX</button>
+              </div>
+            </div>
+            <div class="field-error" id="ptError"></div>
+          </div>
+
+          <div class="field">
+            <label for="keyInput">
+              <span>Kunci AES-128</span>
+              <span class="field-hint">32 karakter hex (16 byte)</span>
+            </label>
+            <div class="field-row">
+              <input type="text" id="keyInput" class="field-input mono" placeholder="mis. 000102030405060708090a0b0c0d0e0f" maxlength="32" autocomplete="off" spellcheck="false">
+              <button type="button" class="ghost-btn" id="randomKeyBtn" title="Isi kunci acak">RANDOM</button>
+            </div>
+            <div class="field-error" id="keyError"></div>
+          </div>
+        </div>
+
+        <div class="action-row">
+          <button class="primary-btn" id="runBtn">
+            <span id="runBtnLabel">ENCRYPT</span>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h9M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="secondary-btn" id="resetBtn">RESET</button>
+          <label class="toggle-row">
+            <input type="checkbox" id="traceToggle" checked>
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-label">Tampilkan detail proses</span>
+          </label>
+        </div>
+
+        <div class="output-block" id="outputBlock" hidden>
+          <div class="output-label" id="outputLabel">Ciphertext (hex)</div>
+          <div class="output-row">
+            <code class="output-value mono" id="outputValue"></code>
+            <button class="ghost-btn" id="copyBtn">COPY</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- STATUS / VALIDATION NOTICE -->
+      <div class="notice" id="implNotice">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="11" r="0.8" fill="currentColor"/></svg>
+        <div>
+          <strong>Mesin AES sudah aktif.</strong>
+          Gunakan tombol ENCRYPT atau DECRYPT untuk melihat alur kerja lengkap, lalu buka Key Expansion dan Round Trace untuk memeriksa tiap langkah dengan notasi matematika yang lebih jelas.
+        </div>
+      </div>
+
+      <!-- KEY EXPANSION SECTION -->
+      <section class="panel" id="keyExpansionPanel" hidden>
+        <button class="section-toggle" data-target="keyExpansionBody" aria-expanded="true">
+          <span class="section-chevron">▾</span>
+          <span class="section-title">Key Expansion</span>
+          <span class="section-sub">W[0] … W[43] · RK0 … RK10</span>
+        </button>
+        <div class="section-body" id="keyExpansionBody"></div>
+      </section>
+
+      <!-- ROUNDS CONTAINER -->
+      <section class="rounds" id="roundsContainer"></section>
+
+    </main>
+  </div>
+
+  <footer class="footer">
+    <span>AES-128 Register Trace Simulator — Tugas Kriptografi</span>
+  </footer>
+</div>
+
+<template id="matrixTemplate">
+  <div class="matrix-block">
+    <div class="matrix-block-label"></div>
+    <div class="matrix-grid"></div>
+  </div>
+</template>
+
+<script src="aes-tables.js"></script>
+<script src="aes.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
